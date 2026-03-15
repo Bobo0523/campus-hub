@@ -1,10 +1,9 @@
 import { useState } from "react";
-import { supabase } from "../../lib/supabaseClient"
+import { supabase } from "../../lib/supabaseClient";
 
 function AuthForm() {
 
   const [email,setEmail] = useState("");
-  const [password,setPassword] = useState("");
   const [message,setMessage] = useState("");
 
   const validDomain = "@students.waikato.ac.nz";
@@ -13,7 +12,7 @@ function AuthForm() {
     return email.endsWith(validDomain);
   }
 
-  async function handleSignup(e){
+  async function handleOTP(e){
     e.preventDefault();
 
     if(!checkEmail(email)){
@@ -21,58 +20,33 @@ function AuthForm() {
       return;
     }
 
-    const { error } = await supabase.auth.signUp({
-      email,
-      password
+    const { error } = await supabase.auth.signInWithOtp({
+      email
     });
 
     if(error){
       setMessage(error.message);
-    }else{
-      setMessage("Signup successful. Check your email.");
-    }
-  }
-
-  async function handleLogin(e){
-    e.preventDefault();
-
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password
-    });
-
-    if(error){
-      setMessage(error.message);
+    } else {
+      setMessage("Check your email for the login link.");
     }
   }
 
   return (
     <div style={{padding:"40px"}}>
 
-      <h2>Student Login</h2>
+      <h2>Waikato Student Login</h2>
 
       <input
         type="email"
-        placeholder="student email"
+        placeholder="yourname@students.waikato.ac.nz"
         value={email}
         onChange={(e)=>setEmail(e.target.value)}
       />
 
       <br/><br/>
 
-      <input
-        type="password"
-        placeholder="password"
-        value={password}
-        onChange={(e)=>setPassword(e.target.value)}
-      />
-
-      <br/><br/>
-
-      <button onClick={handleLogin}>Login</button>
-
-      <button onClick={handleSignup} style={{marginLeft:"10px"}}>
-        Sign Up
+      <button onClick={handleOTP}>
+        Send Login Code
       </button>
 
       <p>{message}</p>
