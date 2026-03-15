@@ -4,7 +4,9 @@ import { supabase } from "../../lib/supabaseClient";
 function AuthForm() {
 
   const [email,setEmail] = useState("");
+  const [otp,setOtp] = useState("");
   const [message,setMessage] = useState("");
+  const [showOTP,setShowOTP] = useState(false);
 
   const validDomain = "@students.waikato.ac.nz";
 
@@ -12,8 +14,7 @@ function AuthForm() {
     return email.endsWith(validDomain);
   }
 
-  async function handleOTP(e){
-    e.preventDefault();
+  async function sendCode(){
 
     if(!checkEmail(email)){
       setMessage("Use your Waikato student email.");
@@ -27,7 +28,21 @@ function AuthForm() {
     if(error){
       setMessage(error.message);
     } else {
-      setMessage("Check your email for the login link.");
+      setMessage("OTP sent. Check your email.");
+      setShowOTP(true);   // 👈 show OTP input
+    }
+  }
+
+  async function verifyCode(){
+
+    const { error } = await supabase.auth.verifyOtp({
+      email,
+      token: otp,
+      type: "email"
+    });
+
+    if(error){
+      setMessage(error.message);
     }
   }
 
@@ -45,9 +60,30 @@ function AuthForm() {
 
       <br/><br/>
 
-      <button onClick={handleOTP}>
+      <button onClick={sendCode}>
         Send Login Code
       </button>
+
+      {showOTP && (
+        <div>
+
+          <br/>
+
+          <input
+            type="text"
+            placeholder="Enter OTP"
+            value={otp}
+            onChange={(e)=>setOtp(e.target.value)}
+          />
+
+          <br/><br/>
+
+          <button onClick={verifyCode}>
+            Verify Code
+          </button>
+
+        </div>
+      )}
 
       <p>{message}</p>
 
