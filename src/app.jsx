@@ -1,9 +1,10 @@
 // App.jsx 的逻辑雏形
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { useState, useEffect } from 'react';
 import AuthForm from './components/auth/AuthForm';
 import Dashboard from './components/layout/Dashboard';
 import { supabase } from './lib/supabaseClient';
-
+import LostAndFound from './components/layout/LostAndFound';
 function App() {
   const [session, setSession] = useState(null);
 
@@ -30,7 +31,24 @@ function App() {
   }
 
   // if logged in → show dashboard
-  return <Dashboard session={session} />;
+  return (
+    <BrowserRouter basename="/campus-hub">
+
+      <Routes>
+
+        <Route
+          path="/"
+          element={<Dashboard session={session} />}
+        />
+
+        <Route
+          path="/lost-and-found"
+          element={<LostAndFound session={session} />}
+        />
+
+      </Routes>
+
+    </BrowserRouter>);
 }
 
 export default App;
