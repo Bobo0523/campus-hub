@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { supabase } from "../../lib/supabaseClient";
 
 export default function LostAndFound({ session }) {
-
   const [item, setItem] = useState("");
   const [contact, setContact] = useState("");
   const [message, setMessage] = useState("");
@@ -13,7 +12,6 @@ export default function LostAndFound({ session }) {
   }, []);
 
   async function loadLostItems() {
-
     const { data, error } = await supabase
       .from("lost_and_found")
       .select("*")
@@ -28,7 +26,6 @@ export default function LostAndFound({ session }) {
   }
 
   async function submitLostItem(e) {
-
     e.preventDefault();
 
     if (!item || !contact) {
@@ -36,19 +33,16 @@ export default function LostAndFound({ session }) {
       return;
     }
 
-    const { error } = await supabase
-      .from("lost_and_found")
-      .insert([
-        {
-          item: item,
-          personal_contact: contact
-        }
-      ]);
+    const { error } = await supabase.from("lost_and_found").insert([
+      {
+        item: item,
+        personal_contact: contact,
+      },
+    ]);
 
     if (error) {
       setMessage(error.message);
     } else {
-
       setMessage("Lost item submitted");
 
       setItem("");
@@ -60,11 +54,9 @@ export default function LostAndFound({ session }) {
 
   return (
     <div style={{ padding: "20px" }}>
-
       <h1>Lost and Found</h1>
 
       <form onSubmit={submitLostItem}>
-
         <h3>Submit Lost Item</h3>
 
         <input
@@ -74,7 +66,8 @@ export default function LostAndFound({ session }) {
           onChange={(e) => setItem(e.target.value)}
         />
 
-        <br /><br />
+        <br />
+        <br />
 
         <input
           type="text"
@@ -83,45 +76,38 @@ export default function LostAndFound({ session }) {
           onChange={(e) => setContact(e.target.value)}
         />
 
-        <br /><br />
+        <br />
+        <br />
 
-        <button type="submit">
-          Submit
-        </button>
-
+        <button type="submit">Submit</button>
       </form>
 
-      {message && (
-        <p style={{ color: "red" }}>
-          {message}
-        </p>
-      )}
+      {message && <p style={{ color: "red" }}>{message}</p>}
 
       <hr />
 
       <h3>All Lost Items</h3>
 
-      {lostItems.map(item => (
-
+      {lostItems.map((item) => (
         <div
           key={item.id}
           style={{
             border: "1px solid #ccc",
             padding: "10px",
-            marginBottom: "10px"
+            marginBottom: "10px",
           }}
         >
-          <p><b>Item:</b> {item.item}</p>
-          <p><b>Contact:</b> {item.personal_contact}</p>
           <p>
-            <small>
-              {new Date(item.created_at).toLocaleString()}
-            </small>
+            <b>Item:</b> {item.item}
+          </p>
+          <p>
+            <b>Contact:</b> {item.personal_contact}
+          </p>
+          <p>
+            <small>{new Date(item.created_at).toLocaleString()}</small>
           </p>
         </div>
-
       ))}
-
     </div>
   );
 }

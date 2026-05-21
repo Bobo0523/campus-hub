@@ -2,91 +2,82 @@ import { useState } from "react";
 import { supabase } from "../../lib/supabaseClient";
 
 function AuthForm() {
-
-  const [email,setEmail] = useState("");
-  const [otp,setOtp] = useState("");
-  const [message,setMessage] = useState("");
-  const [showOTP,setShowOTP] = useState(false);
+  const [email, setEmail] = useState("");
+  const [otp, setOtp] = useState("");
+  const [message, setMessage] = useState("");
+  const [showOTP, setShowOTP] = useState(false);
 
   const validDomain = "@students.waikato.ac.nz";
 
-  function checkEmail(email){
+  function checkEmail(email) {
     return email.endsWith(validDomain);
   }
 
-  async function sendCode(){
-
-    if(!checkEmail(email)){
-      setMessage("Use your Waikato student email.");
-      return;
-    }
+  async function sendCode() {
+    // if(!checkEmail(email)){
+    //   setMessage("Use your Waikato student email.");
+    //   return;
+    // }
 
     const { error } = await supabase.auth.signInWithOtp({
-      email
+      email,
     });
 
-    if(error){
+    if (error) {
       setMessage(error.message);
     } else {
       setMessage("OTP sent. Check your email.");
-      setShowOTP(true);   // 👈 show OTP input
+      setShowOTP(true); // 👈 show OTP input
     }
   }
 
-  async function verifyCode(){
-
+  async function verifyCode() {
     const { error } = await supabase.auth.verifyOtp({
       email,
       token: otp,
-      type: "email"
+      type: "email",
     });
 
-    if(error){
+    if (error) {
       setMessage(error.message);
     }
   }
 
   return (
-    <div style={{padding:"40px"}}>
-
+    <div style={{ padding: "40px" }}>
       <h2>Waikato Student Login</h2>
 
       <input
         type="email"
         placeholder="yourname@students.waikato.ac.nz"
         value={email}
-        onChange={(e)=>setEmail(e.target.value)}
+        onChange={(e) => setEmail(e.target.value)}
       />
 
-      <br/><br/>
+      <br />
+      <br />
 
-      <button onClick={sendCode}>
-        Send Login Code
-      </button>
+      <button onClick={sendCode}>Send Login Code</button>
 
       {showOTP && (
         <div>
-
-          <br/>
+          <br />
 
           <input
             type="text"
             placeholder="Enter OTP"
             value={otp}
-            onChange={(e)=>setOtp(e.target.value)}
+            onChange={(e) => setOtp(e.target.value)}
           />
 
-          <br/><br/>
+          <br />
+          <br />
 
-          <button onClick={verifyCode}>
-            Verify Code
-          </button>
-
+          <button onClick={verifyCode}>Verify Code</button>
         </div>
       )}
 
       <p>{message}</p>
-
     </div>
   );
 }
