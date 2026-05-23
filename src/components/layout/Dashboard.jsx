@@ -6,8 +6,9 @@ import "react-calendar/dist/Calendar.css";
 import ActivityCard from "./ActivityCard";
 import { io } from "socket.io-client";
 
-// Create socket outside component so it's not recreated on re-render
 const socket = io("http://localhost:3000");
+
+/* ─── shared table styles ─── */
 const thStyle = {
   padding: "10px 14px",
   textAlign: "left",
@@ -15,12 +16,318 @@ const thStyle = {
   fontWeight: "600",
   whiteSpace: "nowrap",
 };
-
 const tdStyle = {
   padding: "10px 14px",
   borderBottom: "1px solid #e0e0e0",
   verticalAlign: "top",
 };
+
+/* ─── reusable modal backdrop + card ─── */
+function Modal({ onClose, children, wide }) {
+  useEffect(() => {
+    const esc = (e) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", esc);
+    return () => window.removeEventListener("keydown", esc);
+  }, [onClose]);
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(8,8,20,0.62)",
+        backdropFilter: "blur(6px)",
+        zIndex: 3000,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "20px",
+        animation: "fadeInBackdrop 0.2s ease",
+      }}
+      onClick={onClose}
+    >
+      <div
+        style={{
+          background: "#ffffff",
+          borderRadius: "20px",
+          width: "100%",
+          maxWidth: wide ? "640px" : "460px",
+          maxHeight: "90vh",
+          overflowY: "auto",
+          boxShadow:
+            "0 32px 80px rgba(0,0,40,0.28), 0 0 0 1px rgba(0,0,40,0.06)",
+          animation: "slideUp 0.28s cubic-bezier(0.34,1.56,0.64,1)",
+          position: "relative",
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function ModalHeader({ icon, title, subtitle, onClose }) {
+  return (
+    <div
+      style={{
+        padding: "28px 28px 0",
+        borderBottom: "1px solid #f0f0f6",
+        paddingBottom: "20px",
+        marginBottom: "24px",
+        display: "flex",
+        alignItems: "flex-start",
+        gap: "14px",
+      }}
+    >
+      <div
+        style={{
+          width: "44px",
+          height: "44px",
+          borderRadius: "12px",
+          background: "linear-gradient(135deg,#1a1a2e,#3a3a6e)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: "1.2rem",
+          flexShrink: 0,
+        }}
+      >
+        {icon}
+      </div>
+      <div style={{ flex: 1, paddingTop: "2px" }}>
+        <div
+          style={{
+            fontFamily: "'DM Serif Display',serif",
+            fontSize: "1.25rem",
+            color: "#111",
+            lineHeight: 1.2,
+          }}
+        >
+          {title}
+        </div>
+        {subtitle && (
+          <div style={{ fontSize: "0.8rem", color: "#888", marginTop: "3px" }}>
+            {subtitle}
+          </div>
+        )}
+      </div>
+      <button
+        onClick={onClose}
+        style={{
+          background: "#f4f4f8",
+          border: "none",
+          borderRadius: "8px",
+          width: "32px",
+          height: "32px",
+          cursor: "pointer",
+          fontSize: "1rem",
+          color: "#666",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexShrink: 0,
+          transition: "background 0.15s",
+        }}
+        onMouseOver={(e) => (e.currentTarget.style.background = "#e8e8f0")}
+        onMouseOut={(e) => (e.currentTarget.style.background = "#f4f4f8")}
+      >
+        ×
+      </button>
+    </div>
+  );
+}
+
+/* ─── styled input / label helpers ─── */
+const labelStyle = {
+  display: "block",
+  fontSize: "0.78rem",
+  fontWeight: "600",
+  letterSpacing: "0.05em",
+  color: "#555",
+  textTransform: "uppercase",
+  marginBottom: "6px",
+};
+const inputStyle = {
+  width: "100%",
+  padding: "10px 14px",
+  borderRadius: "10px",
+  border: "1.5px solid #e0e0ec",
+  fontSize: "0.92rem",
+  color: "#111",
+  background: "#fafafa",
+  outline: "none",
+  boxSizing: "border-box",
+  transition: "border-color 0.15s, box-shadow 0.15s",
+  fontFamily: "inherit",
+};
+const focusStyle = {
+  borderColor: "#3a3a6e",
+  boxShadow: "0 0 0 3px rgba(58,58,110,0.1)",
+  background: "#fff",
+};
+
+function Field({ label, children }) {
+  return (
+    <div style={{ marginBottom: "18px" }}>
+      {label && <label style={labelStyle}>{label}</label>}
+      {children}
+    </div>
+  );
+}
+
+function StyledInput({ label, ...props }) {
+  const [focused, setFocused] = useState(false);
+  return (
+    <Field label={label}>
+      <input
+        {...props}
+        style={{ ...inputStyle, ...(focused ? focusStyle : {}) }}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+      />
+    </Field>
+  );
+}
+
+function StyledSelect({ label, children, value, onChange, required }) {
+  const [focused, setFocused] = useState(false);
+  return (
+    <Field label={label}>
+      <select
+        value={value}
+        onChange={onChange}
+        required={required}
+        style={{
+          ...inputStyle,
+          cursor: "pointer",
+          ...(focused ? focusStyle : {}),
+        }}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+      >
+        {children}
+      </select>
+    </Field>
+  );
+}
+
+function StyledTextarea({ label, ...props }) {
+  const [focused, setFocused] = useState(false);
+  return (
+    <Field label={label}>
+      <textarea
+        {...props}
+        style={{
+          ...inputStyle,
+          resize: "vertical",
+          minHeight: "80px",
+          ...(focused ? focusStyle : {}),
+        }}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+      />
+    </Field>
+  );
+}
+
+function PrimaryBtn({ children, disabled, onClick, type = "submit", danger }) {
+  return (
+    <button
+      type={type}
+      onClick={onClick}
+      disabled={disabled}
+      style={{
+        padding: "11px 24px",
+        borderRadius: "10px",
+        border: "none",
+        background: danger
+          ? "linear-gradient(135deg,#c0392b,#e74c3c)"
+          : "linear-gradient(135deg,#1a1a2e,#3a3a6e)",
+        color: "#fff",
+        fontFamily: "inherit",
+        fontSize: "0.9rem",
+        fontWeight: "600",
+        cursor: disabled ? "not-allowed" : "pointer",
+        opacity: disabled ? 0.6 : 1,
+        transition: "opacity 0.15s, transform 0.1s",
+      }}
+      onMouseOver={(e) =>
+        !disabled && (e.currentTarget.style.transform = "translateY(-1px)")
+      }
+      onMouseOut={(e) => (e.currentTarget.style.transform = "none")}
+    >
+      {children}
+    </button>
+  );
+}
+
+function GhostBtn({ children, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        padding: "11px 20px",
+        borderRadius: "10px",
+        border: "1.5px solid #e0e0ec",
+        background: "transparent",
+        color: "#666",
+        fontFamily: "inherit",
+        fontSize: "0.9rem",
+        cursor: "pointer",
+        transition: "background 0.15s",
+      }}
+      onMouseOver={(e) => (e.currentTarget.style.background = "#f4f4f8")}
+      onMouseOut={(e) => (e.currentTarget.style.background = "transparent")}
+    >
+      {children}
+    </button>
+  );
+}
+
+/* ─── nav pill buttons ─── */
+function NavBtn({ icon, label, onClick, accent }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: "8px",
+        padding: "9px 18px",
+        borderRadius: "100px",
+        border: "1.5px solid #e0e0ec",
+        background: "#fff",
+        color: "#1a1a2e",
+        fontFamily: "inherit",
+        fontSize: "0.85rem",
+        fontWeight: "500",
+        cursor: "pointer",
+        boxShadow: "0 2px 8px rgba(0,0,40,0.06)",
+        transition: "all 0.15s",
+        whiteSpace: "nowrap",
+      }}
+      onMouseOver={(e) => {
+        e.currentTarget.style.background = "#1a1a2e";
+        e.currentTarget.style.color = "#fff";
+        e.currentTarget.style.borderColor = "#1a1a2e";
+      }}
+      onMouseOut={(e) => {
+        e.currentTarget.style.background = "#fff";
+        e.currentTarget.style.color = "#1a1a2e";
+        e.currentTarget.style.borderColor = "#e0e0ec";
+      }}
+    >
+      <span>{icon}</span>
+      <span>{label}</span>
+    </button>
+  );
+}
+
+/* ═══════════════════════════════════════
+   MAIN DASHBOARD
+════════════════════════════════════════ */
 export default function Dashboard({ session }) {
   const [suggestion, setSuggestion] = useState(null);
   const audioRef = useRef(null);
@@ -53,19 +360,17 @@ export default function Dashboard({ session }) {
   const [assignmentMessage, setAssignmentMessage] = useState("");
   const [assignmentUploading, setAssignmentUploading] = useState(false);
   const [meditatingCount, setMeditatingCount] = useState(0);
+
   useEffect(() => {
     loadActivities();
     loadSuggestion();
   }, []);
-  useEffect(() => {
-    socket.on("meditation_count", (count) => {
-      setMeditatingCount(count);
-    });
 
-    return () => {
-      socket.off("meditation_count");
-    };
+  useEffect(() => {
+    socket.on("meditation_count", (count) => setMeditatingCount(count));
+    return () => socket.off("meditation_count");
   }, []);
+
   useEffect(() => {
     fetch("http://localhost:3000/music")
       .then((r) => r.json())
@@ -74,6 +379,7 @@ export default function Dashboard({ session }) {
       })
       .catch(console.error);
   }, []);
+
   useEffect(() => {
     if (!isRunning) return;
     if (timeLeft <= 0) {
@@ -82,58 +388,50 @@ export default function Dashboard({ session }) {
         audioRef.current.pause();
         audioRef.current.currentTime = 0;
       }
-      socket.emit("meditation_stop", session.user.id); // ← replaces supabase delete
+      socket.emit("meditation_stop", session.user.id);
       return;
     }
     const id = setInterval(() => setTimeLeft((t) => t - 1), 1000);
     return () => clearInterval(id);
   }, [isRunning, timeLeft]);
+
   async function loadSuggestion() {
     const { data, error } = await supabase
       .from("student_suggestions")
       .select("suggestion")
       .eq("user_id", session.user.id)
       .single();
-
-    if (!error && data) {
-      setSuggestion(data.suggestion);
-    }
+    if (!error && data) setSuggestion(data.suggestion);
   }
+
   async function loadActivities() {
     const { data, error } = await supabase
       .from("activities")
       .select("*")
       .order("time", { ascending: false });
-
     if (error) {
       console.error(error);
       setMessage("Error loading activities: " + error.message);
-    } else {
-      setActivities(data);
-    }
+    } else setActivities(data);
   }
+
   async function handleAssignmentSubmit(e) {
     e.preventDefault();
     if (!assignmentFile || !assignmentDeadline) {
       setAssignmentMessage("Please select a PDF and set a deadline.");
       return;
     }
-
     setAssignmentUploading(true);
-    setAssignmentMessage("Uploading...");
-
+    setAssignmentMessage("Uploading…");
     const filePath = `/${session.user.id}/${Date.now()}_${assignmentFile.name}`;
-
     const { error: uploadError } = await supabase.storage
       .from("assignments")
       .upload(filePath, assignmentFile, { contentType: "application/pdf" });
-
     if (uploadError) {
       setAssignmentMessage("Upload failed: " + uploadError.message);
       setAssignmentUploading(false);
       return;
     }
-
     const { error: dbError } = await supabase.from("assignments").insert([
       {
         user_id: session.user.id,
@@ -141,18 +439,20 @@ export default function Dashboard({ session }) {
         deadline: new Date(assignmentDeadline).toISOString(),
       },
     ]);
-
     if (dbError) {
       setAssignmentMessage("DB error: " + dbError.message);
     } else {
-      setAssignmentMessage("Assignment submitted successfully!");
+      setAssignmentMessage("✓ Submitted successfully!");
       setAssignmentFile(null);
       setAssignmentDeadline("");
-      setShowAssignmentForm(false);
+      setTimeout(() => {
+        setShowAssignmentForm(false);
+        setAssignmentMessage("");
+      }, 1200);
     }
-
     setAssignmentUploading(false);
   }
+
   async function saveNotification() {
     const { error } = await supabase.from("profiles").upsert({
       user_id: session.user.id,
@@ -160,10 +460,8 @@ export default function Dashboard({ session }) {
       telegram_token: telegramToken,
       telegram_chat_id: chatId,
     });
-
-    if (error) {
-      setMessage(error.message);
-    } else {
+    if (error) setMessage(error.message);
+    else {
       setMessage("Notification settings saved.");
       setShowNotifyForm(false);
     }
@@ -173,44 +471,31 @@ export default function Dashboard({ session }) {
     setSelectedDate(date);
     loadSlots(date);
   }
+
   async function loadSlots(date) {
     const start = new Date(date);
     start.setHours(0, 0, 0, 0);
-
     const end = new Date(date);
     end.setHours(23, 59, 59, 999);
-
     const { data } = await supabase
       .from("inspection_time")
       .select("*")
       .gte("inspection", start.toISOString())
       .lte("inspection", end.toISOString());
-
     const takenHours = data.map((i) => new Date(i.inspection).getHours());
-
-    // find current user's booking
     const mine = data.find((i) => i.user_id === session.user.id);
     setMySlot(mine ? new Date(mine.inspection).getHours() : null);
-
     const list = [];
-
-    for (let h = 9; h <= 16; h++) {
-      list.push({
-        hour: h,
-        taken: takenHours.includes(h),
-      });
-    }
-
+    for (let h = 9; h <= 16; h++)
+      list.push({ hour: h, taken: takenHours.includes(h) });
     setSlots(list);
   }
+
   async function startMeditation(minutes) {
     setDuration(minutes);
     setTimeLeft(minutes * 60);
     setIsRunning(true);
-
-    socket.data = { userId: session.user.id }; // attach for disconnect cleanup
     socket.emit("meditation_start", session.user.id);
-
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
@@ -226,41 +511,31 @@ export default function Dashboard({ session }) {
     setIsRunning(false);
     setDuration(null);
     setTimeLeft(0);
-
     socket.emit("meditation_stop", session.user.id);
-
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
     }
     setShowMeditation(false);
   }
+
   async function bookSlot(hour) {
     const d = new Date(selectedDate);
     d.setHours(hour, 0, 0, 0);
-
-    const { error } = await supabase.from("inspection_time").upsert(
-      {
-        user_id: session.user.id,
-        inspection: d.toISOString(),
-      },
-      {
-        onConflict: "user_id",
-      },
-    );
-
-    if (error) {
-      alert("This slot is already taken.");
-    } else {
-      loadSlots(selectedDate);
-    }
+    const { error } = await supabase
+      .from("inspection_time")
+      .upsert(
+        { user_id: session.user.id, inspection: d.toISOString() },
+        { onConflict: "user_id" },
+      );
+    if (error) alert("This slot is already taken.");
+    else loadSlots(selectedDate);
   }
+
   async function handleSubmit(e) {
     e.preventDefault();
-
-    setMessage("Submitting...");
-
-    const { data, error } = await supabase.from("activities").insert([
+    setMessage("Submitting…");
+    const { error } = await supabase.from("activities").insert([
       {
         title,
         category,
@@ -270,111 +545,682 @@ export default function Dashboard({ session }) {
         user_id: session.user.id,
       },
     ]);
-
     if (error) {
       console.error(error);
       setMessage("Submission failed: " + error.message);
       return;
     }
-
     setMessage("Activity submitted successfully.");
-
     setTitle("");
     setCategory("");
     setTime("");
     setPayment("");
     setLocation("");
-
     setShowForm(false);
-
     loadActivities();
   }
 
-  const workActivities = activities.filter((a) => a.category === "Work");
-  const studyActivities = activities.filter((a) => a.category === "Study");
-  const lifeActivities = activities.filter((a) => a.category === "Life");
-
   return (
-    <div style={{ padding: "20px" }}>
-      <h1>Waikato Campus Hub</h1>
-
-      <button onClick={() => setShowForm(true)}>Submit Activity</button>
-      <button
-        onClick={() => setShowAssignmentForm(true)}
-        style={{ marginLeft: "10px" }}
-      >
-        Submit Assignment
-      </button>
-      <button
-        onClick={() => setShowNotifyForm(true)}
-        style={{ marginLeft: "10px" }}
-      >
-        Notification Settings
-      </button>
-      <button
-        onClick={() => navigate("/lost-and-found")}
-        style={{ marginLeft: "10px" }}
-      >
-        Lost something?
-      </button>
-      <button
-        onClick={() => {
-          setShowCalendar(true);
-        }}
-        style={{ marginLeft: "10px" }}
-      >
-        Book Inspection Time
-      </button>
-      <button
-        onClick={() => setShowMeditation(true)}
-        style={{ marginLeft: "10px" }}
-      >
-        Meditation
-      </button>
-      {showMeditation && (
+    <>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Sora:wght@300;400;500;600&display=swap');
+        @keyframes fadeInBackdrop { from { opacity:0 } to { opacity:1 } }
+        @keyframes slideUp { from { opacity:0; transform:translateY(28px) scale(0.97) } to { opacity:1; transform:translateY(0) scale(1) } }
+        * { box-sizing: border-box; }
+        body { font-family: 'Sora', sans-serif; }
+        .hub-root * { font-family: 'Sora', sans-serif; }
+        .slot-btn { padding:10px 16px; border-radius:10px; border:1.5px solid; font-family:'Sora',sans-serif; font-size:0.82rem; font-weight:600; cursor:pointer; transition:all 0.15s; }
+        .slot-btn:hover:not(:disabled) { transform:translateY(-2px); box-shadow:0 4px 12px rgba(0,0,0,0.12); }
+        .react-calendar { border:none !important; width:100% !important; font-family:'Sora',sans-serif !important; border-radius:12px; background:#f8f8fc !important; padding:8px; }
+        .react-calendar__tile--active { background:#1a1a2e !important; border-radius:8px !important; }
+        .react-calendar__tile:hover { background:#e8e8f4 !important; border-radius:8px !important; }
+        .help-step { background:#f4f4fb; border-radius:8px; padding:12px 16px; margin-bottom:10px; }
+        .help-step h4 { margin:0 0 6px; font-size:0.82rem; text-transform:uppercase; letter-spacing:0.06em; color:#3a3a6e; }
+        .help-step ol { margin:0; padding-left:18px; font-size:0.82rem; color:#555; line-height:1.7; }
+      `}</style>
+      <div className="min-vh-100 bg-light">
         <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.55)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 1000,
-          }}
+          className="hub-root"
+          style={{ padding: "32px 28px", maxWidth: "1200px", margin: "0 auto" }}
         >
+          {/* ── PAGE HEADER ── */}
+          <div
+            className="px-4 py-5 text-center text-white rounded-4"
+            style={{ background: "linear-gradient(135deg, #1a1a2e, #3a3a6e)" }}
+          >
+            <h1 className="display-4 fw-bold mb-2">Waikato Campus Hub</h1>
+            <p className="lead text-white-50 mb-0">
+              Manage your activities, assignments, and campus life
+            </p>
+          </div>
+
+          {/* ── NAV BUTTONS ── */}
           <div
             style={{
-              background: "#1a1a2e",
-              color: "#e0e0ff",
-              borderRadius: "16px",
-              padding: "36px 40px",
-              minWidth: "320px",
-              textAlign: "center",
-              boxShadow: "0 8px 40px rgba(0,0,100,0.4)",
+              display: "flex",
+              flexWrap: "wrap",
+              gap: "10px",
+              marginBottom: "32px",
             }}
           >
-            <h2
+            <NavBtn
+              icon="✦"
+              label="Submit Activity"
+              onClick={() => setShowForm(true)}
+            />
+            <NavBtn
+              icon="📎"
+              label="Submit Assignment"
+              onClick={() => setShowAssignmentForm(true)}
+            />
+            <NavBtn
+              icon="🔔"
+              label="Notification Settings"
+              onClick={() => setShowNotifyForm(true)}
+            />
+            <NavBtn
+              icon="🔍"
+              label="Lost something?"
+              onClick={() => navigate("/lost-and-found")}
+            />
+            <NavBtn
+              icon="📅"
+              label="Book Inspection Time"
+              onClick={() => setShowCalendar(true)}
+            />
+            <NavBtn
+              icon="🧘"
+              label="Meditation"
+              onClick={() => setShowMeditation(true)}
+            />
+          </div>
+
+          {message && (
+            <div
               style={{
-                margin: "0 0 8px",
-                fontSize: "1.6rem",
-                letterSpacing: "0.05em",
+                padding: "12px 16px",
+                borderRadius: "10px",
+                background:
+                  message.includes("success") || message.includes("saved")
+                    ? "#e8f5e9"
+                    : "#fdecea",
+                color:
+                  message.includes("success") || message.includes("saved")
+                    ? "#2e7d32"
+                    : "#c62828",
+                fontSize: "0.85rem",
+                marginBottom: "24px",
+                fontWeight: "500",
               }}
             >
-              🧘 Meditation
+              {message}
+            </div>
+          )}
+
+          {/* ── SUGGESTION PANEL ── */}
+          {suggestion && (
+            <div
+              style={{
+                marginBottom: "32px",
+                border: "1.5px solid #e8e8f4",
+                borderRadius: "16px",
+                padding: "24px",
+                background: "#fafafe",
+              }}
+            >
+              <h2
+                style={{
+                  fontFamily: "'DM Serif Display',serif",
+                  margin: "0 0 12px",
+                  fontSize: "1.3rem",
+                  color: "#1a1a2e",
+                }}
+              >
+                📚 Assignment Suggestions
+              </h2>
+              <p
+                style={{
+                  lineHeight: "1.75",
+                  color: "#444",
+                  fontSize: "0.88rem",
+                }}
+              >
+                {suggestion.study_plan}
+              </p>
+              <table
+                style={{
+                  width: "100%",
+                  borderCollapse: "collapse",
+                  marginTop: "16px",
+                  fontSize: "0.85rem",
+                }}
+              >
+                <thead>
+                  <tr style={{ background: "#ededf8" }}>
+                    <th style={thStyle}>#</th>
+                    <th style={thStyle}>Name</th>
+                    <th style={thStyle}>Deadline</th>
+                    <th style={thStyle}>Est. Hours</th>
+                    <th style={thStyle}>Summary</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {suggestion.start_order.map((orderIndex, rank) => {
+                    const a = suggestion.assignments[orderIndex - 1];
+                    if (!a) return null;
+                    const fileName = a.pdf_path.split("/").pop();
+                    const deadlineNZ = new Date(a.deadline).toLocaleString(
+                      "en-NZ",
+                      {
+                        timeZone: "Pacific/Auckland",
+                        year: "numeric",
+                        month: "short",
+                        day: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      },
+                    );
+                    return (
+                      <tr
+                        key={rank}
+                        style={{
+                          background: rank % 2 === 0 ? "#fff" : "#f6f6fc",
+                        }}
+                      >
+                        <td style={tdStyle}>{rank + 1}</td>
+                        <td style={tdStyle}>{fileName}</td>
+                        <td style={tdStyle}>{deadlineNZ}</td>
+                        <td style={tdStyle}>{a.estimated_hours}h</td>
+                        <td style={tdStyle}>{a.summary}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          <ActivityCalendar activities={activities} session={session} />
+        </div>
+      </div>
+      {/* ════════════════════════════════
+          MODAL: SUBMIT ACTIVITY
+      ════════════════════════════════ */}
+      {showForm && (
+        <Modal onClose={() => setShowForm(false)}>
+          <ModalHeader
+            icon="✦"
+            title="Submit Activity"
+            subtitle="Log a new work, study, or life event"
+            onClose={() => setShowForm(false)}
+          />
+          <form onSubmit={handleSubmit} style={{ padding: "0 28px 28px" }}>
+            <StyledInput
+              label="Activity Title"
+              type="text"
+              placeholder="e.g. Team meeting, Study session…"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              required
+            />
+            <StyledSelect
+              label="Category"
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              required
+            >
+              <option value="" disabled>
+                — Select category —
+              </option>
+              <option value="Work">Work</option>
+              <option value="Study">Study</option>
+              <option value="Life">Life</option>
+            </StyledSelect>
+            <StyledInput
+              label="Date & Time"
+              type="datetime-local"
+              value={time}
+              onChange={(e) => setTime(e.target.value)}
+              required
+            />
+            <StyledInput
+              label="Payment (optional)"
+              type="text"
+              placeholder="spending: −50, income: +200"
+              value={payment}
+              onChange={(e) => setPayment(e.target.value)}
+            />
+            <StyledTextarea
+              label="Location"
+              placeholder="Paste a map link + short description"
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              required
+            />
+            <div
+              style={{
+                display: "flex",
+                gap: "10px",
+                justifyContent: "flex-end",
+                marginTop: "8px",
+              }}
+            >
+              <GhostBtn onClick={() => setShowForm(false)}>Cancel</GhostBtn>
+              <PrimaryBtn>Submit Activity</PrimaryBtn>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* ════════════════════════════════
+          MODAL: SUBMIT ASSIGNMENT
+      ════════════════════════════════ */}
+      {showAssignmentForm && (
+        <Modal
+          onClose={() => {
+            setShowAssignmentForm(false);
+            setAssignmentMessage("");
+          }}
+        >
+          <ModalHeader
+            icon="📎"
+            title="Submit Assignment"
+            subtitle="Upload a PDF before the deadline"
+            onClose={() => {
+              setShowAssignmentForm(false);
+              setAssignmentMessage("");
+            }}
+          />
+          <form
+            onSubmit={handleAssignmentSubmit}
+            style={{ padding: "0 28px 28px" }}
+          >
+            <Field label="PDF File">
+              <div
+                style={{
+                  border: "2px dashed #d0d0ec",
+                  borderRadius: "12px",
+                  padding: "20px",
+                  textAlign: "center",
+                  background: "#fafafa",
+                  cursor: "pointer",
+                  transition: "border-color 0.15s",
+                }}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.currentTarget.style.borderColor = "#3a3a6e";
+                }}
+                onDragLeave={(e) => {
+                  e.currentTarget.style.borderColor = "#d0d0ec";
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  const f = e.dataTransfer.files[0];
+                  if (f?.type === "application/pdf") setAssignmentFile(f);
+                  e.currentTarget.style.borderColor = "#d0d0ec";
+                }}
+              >
+                <div style={{ fontSize: "1.6rem", marginBottom: "6px" }}>
+                  📄
+                </div>
+                <div style={{ fontSize: "0.82rem", color: "#888" }}>
+                  {assignmentFile ? (
+                    <span style={{ color: "#3a3a6e", fontWeight: "600" }}>
+                      {assignmentFile.name}
+                    </span>
+                  ) : (
+                    <>
+                      Drag & drop or{" "}
+                      <label
+                        style={{
+                          color: "#3a3a6e",
+                          cursor: "pointer",
+                          fontWeight: "600",
+                          textDecoration: "underline",
+                        }}
+                      >
+                        browse
+                        <input
+                          type="file"
+                          accept="application/pdf"
+                          required
+                          style={{ display: "none" }}
+                          onChange={(e) => setAssignmentFile(e.target.files[0])}
+                        />
+                      </label>
+                    </>
+                  )}
+                </div>
+              </div>
+            </Field>
+            <StyledInput
+              label="Deadline"
+              type="datetime-local"
+              value={assignmentDeadline}
+              onChange={(e) => setAssignmentDeadline(e.target.value)}
+              required
+            />
+            {assignmentMessage && (
+              <div
+                style={{
+                  padding: "10px 14px",
+                  borderRadius: "8px",
+                  background: assignmentMessage.includes("✓")
+                    ? "#e8f5e9"
+                    : "#fdecea",
+                  color: assignmentMessage.includes("✓")
+                    ? "#2e7d32"
+                    : "#c62828",
+                  fontSize: "0.83rem",
+                  marginBottom: "16px",
+                  fontWeight: "500",
+                }}
+              >
+                {assignmentMessage}
+              </div>
+            )}
+            <div
+              style={{
+                display: "flex",
+                gap: "10px",
+                justifyContent: "flex-end",
+              }}
+            >
+              <GhostBtn
+                onClick={() => {
+                  setShowAssignmentForm(false);
+                  setAssignmentMessage("");
+                }}
+              >
+                Cancel
+              </GhostBtn>
+              <PrimaryBtn disabled={assignmentUploading}>
+                {assignmentUploading ? "Uploading…" : "Submit"}
+              </PrimaryBtn>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* ════════════════════════════════
+          MODAL: NOTIFICATION SETTINGS
+      ════════════════════════════════ */}
+      {showNotifyForm && (
+        <Modal onClose={() => setShowNotifyForm(false)}>
+          <ModalHeader
+            icon="🔔"
+            title="Notification Settings"
+            subtitle="Connect Discord or Telegram for alerts"
+            onClose={() => setShowNotifyForm(false)}
+          />
+          <div style={{ padding: "0 28px 28px" }}>
+            <StyledInput
+              label="Discord Webhook URL"
+              type="text"
+              placeholder="https://discord.com/api/webhooks/…"
+              value={webhook}
+              onChange={(e) => setWebhook(e.target.value)}
+            />
+            <StyledInput
+              label="Telegram Bot Token"
+              type="text"
+              placeholder="123456:ABC-DEF…"
+              value={telegramToken}
+              onChange={(e) => setTelegramToken(e.target.value)}
+            />
+            <StyledInput
+              label="Telegram Chat ID"
+              type="text"
+              placeholder="Your numeric chat ID"
+              value={chatId}
+              onChange={(e) => setChatId(e.target.value)}
+            />
+
+            <button
+              type="button"
+              onClick={() => setShowHelpDialog(!showHelpDialog)}
+              style={{
+                background: "none",
+                border: "none",
+                color: "#3a3a6e",
+                cursor: "pointer",
+                fontSize: "0.82rem",
+                fontWeight: "600",
+                padding: "0",
+                marginBottom: "20px",
+                textDecoration: "underline",
+                fontFamily: "inherit",
+              }}
+            >
+              {showHelpDialog ? "▲ Hide setup guide" : "▼ How do I get these?"}
+            </button>
+
+            {showHelpDialog && (
+              <div style={{ marginBottom: "20px" }}>
+                <div className="help-step">
+                  <h4>Discord Webhook URL</h4>
+                  <ol>
+                    <li>Open your Discord server → Server Settings</li>
+                    <li>Go to Integrations → Webhooks</li>
+                    <li>Create New Webhook → Copy URL</li>
+                  </ol>
+                </div>
+                <div className="help-step">
+                  <h4>Telegram Bot Token</h4>
+                  <ol>
+                    <li>Open Telegram, search @BotFather</li>
+                    <li>Type /newbot and follow the prompts</li>
+                    <li>Copy the API token provided</li>
+                  </ol>
+                </div>
+                <div className="help-step">
+                  <h4>Telegram Chat ID</h4>
+                  <ol>
+                    <li>Search @userinfobot in Telegram</li>
+                    <li>Click Start → copy your Chat ID</li>
+                  </ol>
+                </div>
+              </div>
+            )}
+
+            <div
+              style={{
+                display: "flex",
+                gap: "10px",
+                justifyContent: "flex-end",
+              }}
+            >
+              <GhostBtn onClick={() => setShowNotifyForm(false)}>
+                Cancel
+              </GhostBtn>
+              <PrimaryBtn type="button" onClick={saveNotification}>
+                Save Settings
+              </PrimaryBtn>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* ════════════════════════════════
+          MODAL: BOOK INSPECTION TIME
+      ════════════════════════════════ */}
+      {showCalendar && (
+        <Modal onClose={() => setShowCalendar(false)} wide>
+          <ModalHeader
+            icon="📅"
+            title="Book Inspection Time"
+            subtitle="Pick a date then select an available hour"
+            onClose={() => setShowCalendar(false)}
+          />
+          <div style={{ padding: "0 28px 28px" }}>
+            <div style={{ display: "flex", gap: "24px", flexWrap: "wrap" }}>
+              <div style={{ flex: "1 1 260px" }}>
+                <Calendar onChange={handleDateChange} value={selectedDate} />
+              </div>
+              {selectedDate && (
+                <div style={{ flex: "1 1 200px" }}>
+                  <div
+                    style={{
+                      fontSize: "0.78rem",
+                      fontWeight: "600",
+                      letterSpacing: "0.05em",
+                      textTransform: "uppercase",
+                      color: "#888",
+                      marginBottom: "14px",
+                    }}
+                  >
+                    Available Hours
+                  </div>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(4, 1fr)",
+                      gap: "8px",
+                    }}
+                  >
+                    {slots.map((s) => {
+                      const isMine = mySlot === s.hour;
+                      const isTaken = s.taken && !isMine;
+                      return (
+                        <button
+                          key={s.hour}
+                          className="slot-btn"
+                          onClick={() => !isTaken && bookSlot(s.hour)}
+                          disabled={isTaken}
+                          style={{
+                            borderColor: isMine
+                              ? "#2eaf78"
+                              : isTaken
+                                ? "#e0e0ec"
+                                : "#3a3a6e",
+                            background: isMine
+                              ? "#2eaf78"
+                              : isTaken
+                                ? "#f4f4f8"
+                                : "#fff",
+                            color: isMine
+                              ? "#fff"
+                              : isTaken
+                                ? "#bbb"
+                                : "#1a1a2e",
+                            cursor: isTaken ? "not-allowed" : "pointer",
+                          }}
+                        >
+                          {s.hour}:00
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: "12px",
+                      marginTop: "18px",
+                      fontSize: "0.75rem",
+                    }}
+                  >
+                    {[
+                      ["#2eaf78", "Your booking"],
+                      ["#3a3a6e", "Available"],
+                      ["#f4f4f8", "Taken"],
+                    ].map(([c, l]) => (
+                      <div
+                        key={l}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "5px",
+                        }}
+                      >
+                        <span
+                          style={{
+                            width: 10,
+                            height: 10,
+                            borderRadius: 3,
+                            background: c,
+                            display: "inline-block",
+                            border: "1.5px solid " + c,
+                          }}
+                        />
+                        <span style={{ color: "#888" }}>{l}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                marginTop: "20px",
+              }}
+            >
+              <GhostBtn onClick={() => setShowCalendar(false)}>Close</GhostBtn>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* ════════════════════════════════
+          MODAL: MEDITATION
+      ════════════════════════════════ */}
+      {showMeditation && (
+        <Modal onClose={() => !isRunning && setShowMeditation(false)}>
+          <div
+            style={{
+              background: "linear-gradient(160deg,#0d0d22,#1e1e42)",
+              borderRadius: "20px",
+              padding: "36px 32px",
+              textAlign: "center",
+              color: "#e0e0ff",
+            }}
+          >
+            <div style={{ fontSize: "2rem", marginBottom: "6px" }}>🧘</div>
+            <h2
+              style={{
+                fontFamily: "'DM Serif Display',serif",
+                fontSize: "1.6rem",
+                margin: "0 0 4px",
+                color: "#fff",
+              }}
+            >
+              Meditation
             </h2>
+            <p
+              style={{
+                color: "#8888bb",
+                fontSize: "0.82rem",
+                margin: "0 0 24px",
+              }}
+            >
+              {isRunning
+                ? `${duration}-minute session in progress`
+                : "Choose a duration to begin"}
+            </p>
+
+            {isRunning && (
+              <p
+                style={{
+                  color: "#7eb8f7",
+                  fontSize: "0.8rem",
+                  margin: "0 0 16px",
+                }}
+              >
+                🧘 {meditatingCount}{" "}
+                {meditatingCount === 1 ? "person" : "people"} meditating now
+              </p>
+            )}
 
             {!isRunning ? (
               <>
-                <p style={{ color: "#aaa", marginBottom: "24px" }}>
-                  Select a duration to begin
-                </p>
                 <div
                   style={{
                     display: "flex",
-                    gap: "12px",
+                    gap: "10px",
                     justifyContent: "center",
                     flexWrap: "wrap",
+                    marginBottom: "24px",
                   }}
                 >
                   {[5, 10, 15, 20].map((m) => (
@@ -382,22 +1228,26 @@ export default function Dashboard({ session }) {
                       key={m}
                       onClick={() => startMeditation(m)}
                       style={{
-                        padding: "14px 22px",
-                        fontSize: "1rem",
-                        borderRadius: "10px",
-                        border: "none",
-                        background: "#3a3a6e",
-                        color: "#e0e0ff",
+                        padding: "14px 20px",
+                        fontSize: "0.95rem",
+                        borderRadius: "12px",
+                        border: "1.5px solid #3a3a6e",
+                        background: "rgba(58,58,110,0.4)",
+                        color: "#c0c0ff",
                         cursor: "pointer",
+                        fontFamily: "inherit",
                         fontWeight: "600",
-                        transition: "background 0.2s",
+                        transition: "all 0.15s",
                       }}
-                      onMouseOver={(e) =>
-                        (e.target.style.background = "#5555aa")
-                      }
-                      onMouseOut={(e) =>
-                        (e.target.style.background = "#3a3a6e")
-                      }
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.background = "#3a3a6e";
+                        e.currentTarget.style.color = "#fff";
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.background =
+                          "rgba(58,58,110,0.4)";
+                        e.currentTarget.style.color = "#c0c0ff";
+                      }}
                     >
                       {m} min
                     </button>
@@ -406,14 +1256,14 @@ export default function Dashboard({ session }) {
                 <button
                   onClick={() => setShowMeditation(false)}
                   style={{
-                    marginTop: "28px",
+                    background: "rgba(255,255,255,0.06)",
+                    border: "1px solid rgba(255,255,255,0.12)",
+                    borderRadius: "10px",
+                    color: "#8888bb",
                     padding: "10px 28px",
-                    borderRadius: "8px",
-                    border: "1px solid #555",
-                    background: "transparent",
-                    color: "#aaa",
                     cursor: "pointer",
-                    fontSize: "0.9rem",
+                    fontSize: "0.85rem",
+                    fontFamily: "inherit",
                   }}
                 >
                   Close
@@ -421,27 +1271,14 @@ export default function Dashboard({ session }) {
               </>
             ) : (
               <>
-                <p style={{ color: "#aaa", margin: "0 0 16px" }}>
-                  {duration}-minute session
-                </p>
-                {/* Live count */}
-                <p
-                  style={{
-                    color: "#7eb8f7",
-                    fontSize: "0.85rem",
-                    margin: "0 0 16px",
-                  }}
-                >
-                  🧘 {meditatingCount}{" "}
-                  {meditatingCount === 1 ? "person" : "people"} meditating now
-                </p>
                 <div
                   style={{
-                    fontSize: "4rem",
+                    fontSize: "4.5rem",
                     fontWeight: "700",
-                    letterSpacing: "0.05em",
+                    letterSpacing: "0.06em",
                     color: "#a0c4ff",
                     margin: "16px 0",
+                    fontVariantNumeric: "tabular-nums",
                   }}
                 >
                   {String(Math.floor(timeLeft / 60)).padStart(2, "0")}:
@@ -449,14 +1286,14 @@ export default function Dashboard({ session }) {
                 </div>
                 <p
                   style={{
-                    color: "#888",
-                    fontSize: "0.85rem",
-                    marginBottom: "24px",
+                    color: "#6688aa",
+                    fontSize: "0.82rem",
+                    marginBottom: "28px",
                   }}
                 >
                   {timeLeft === 0
                     ? "✨ Session complete!"
-                    : "🎵 Music playing..."}
+                    : "🎵 Music playing…"}
                 </p>
                 <button
                   onClick={stopMeditation}
@@ -464,415 +1301,31 @@ export default function Dashboard({ session }) {
                     padding: "12px 32px",
                     borderRadius: "10px",
                     border: "none",
-                    background: "#6e3a3a",
+                    background: "linear-gradient(135deg,#7a1a1a,#c0392b)",
                     color: "#ffdddd",
                     cursor: "pointer",
-                    fontSize: "1rem",
+                    fontSize: "0.95rem",
                     fontWeight: "600",
+                    fontFamily: "inherit",
+                    transition: "opacity 0.15s",
                   }}
+                  onMouseOver={(e) => (e.currentTarget.style.opacity = "0.85")}
+                  onMouseOut={(e) => (e.currentTarget.style.opacity = "1")}
                 >
                   End Session
                 </button>
               </>
             )}
           </div>
-        </div>
+        </Modal>
       )}
-      {showCalendar && (
-        <div
-          style={{
-            border: "1px solid #ccc",
-            padding: "20px",
-            marginTop: "20px",
-          }}
-        >
-          <h3>Select Date</h3>
-
-          <Calendar onChange={handleDateChange} value={selectedDate} />
-
-          {selectedDate && (
-            <div style={{ marginTop: "20px" }}>
-              <h4>Select Hour</h4>
-
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "10px" }}>
-                {slots.map((s) => {
-                  const isMine = mySlot === s.hour;
-                  const isTaken = s.taken && !isMine;
-
-                  return (
-                    <button
-                      key={s.hour}
-                      onClick={() => bookSlot(s.hour)}
-                      disabled={isTaken}
-                      style={{
-                        padding: "10px",
-                        backgroundColor: isMine
-                          ? "green"
-                          : isTaken
-                            ? "red"
-                            : "#eee",
-                        color: isTaken || isMine ? "white" : "black",
-                        cursor: isTaken ? "not-allowed" : "pointer",
-                      }}
-                    >
-                      {s.hour}:00
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          <button
-            onClick={() => setShowCalendar(false)}
-            style={{ marginTop: "20px" }}
-          >
-            Close
-          </button>
-        </div>
-      )}
-      {showForm && (
-        <div
-          style={{
-            border: "1px solid #ccc",
-            padding: "20px",
-            marginTop: "20px",
-            maxWidth: "400px",
-          }}
-        >
-          <h3>Submit Activity</h3>
-
-          <form onSubmit={handleSubmit}>
-            <input
-              type="text"
-              placeholder="Activity title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              required
-            />
-
-            <br />
-            <br />
-
-            <select
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              required
-            >
-              <option value="" disabled>
-                -- Select Category --
-              </option>
-              <option value="Work">Work</option>
-              <option value="Study">Study</option>
-              <option value="Life">Life</option>
-            </select>
-
-            <br />
-            <br />
-
-            <input
-              type="datetime-local"
-              value={time}
-              onChange={(e) => setTime(e.target.value)}
-              required
-            />
-
-            <br />
-            <br />
-            <label>
-              Payment(optional):
-              <input
-                type="text"
-                size="25"
-                placeholder="number only spending:- income:+"
-                value={payment}
-                onChange={(e) => setPayment(e.target.value)}
-              />
-            </label>
-            <br />
-            <br />
-            <label style={{ display: "block" }}>Location:</label>
-            <textarea
-              type="text"
-              rows={2}
-              cols={50}
-              placeholder="Recommend a map link + a simple description"
-              value={location}
-              onChange={(e) => setLocation(e.target.value)}
-              required
-            />
-
-            <br />
-            <br />
-
-            <button type="submit">Submit</button>
-
-            <button
-              type="button"
-              onClick={() => setShowForm(false)}
-              style={{ marginLeft: "10px" }}
-            >
-              Cancel
-            </button>
-          </form>
-        </div>
-      )}
-
-      {message && <p style={{ marginTop: "15px", color: "red" }}>{message}</p>}
-      {showAssignmentForm && (
-        <div
-          style={{
-            border: "1px solid #ccc",
-            padding: "20px",
-            marginTop: "20px",
-            maxWidth: "400px",
-          }}
-        >
-          <h3>Submit Assignment</h3>
-          <form onSubmit={handleAssignmentSubmit}>
-            <label style={{ display: "block", marginBottom: "6px" }}>
-              PDF File:
-            </label>
-            <input
-              type="file"
-              accept="application/pdf"
-              required
-              onChange={(e) => setAssignmentFile(e.target.files[0])}
-            />
-
-            <br />
-            <br />
-
-            <label style={{ display: "block", marginBottom: "6px" }}>
-              Deadline:
-            </label>
-            <input
-              type="datetime-local"
-              value={assignmentDeadline}
-              onChange={(e) => setAssignmentDeadline(e.target.value)}
-              required
-            />
-
-            <br />
-            <br />
-
-            <button type="submit" disabled={assignmentUploading}>
-              {assignmentUploading ? "Uploading..." : "Submit"}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setShowAssignmentForm(false);
-                setAssignmentMessage("");
-              }}
-              style={{ marginLeft: "10px" }}
-            >
-              Cancel
-            </button>
-          </form>
-
-          {assignmentMessage && (
-            <p
-              style={{
-                marginTop: "10px",
-                color: assignmentMessage.includes("success") ? "green" : "red",
-              }}
-            >
-              {assignmentMessage}
-            </p>
-          )}
-        </div>
-      )}
-      {showNotifyForm && (
-        <div
-          style={{
-            border: "1px solid #ccc",
-            padding: "20px",
-            marginTop: "20px",
-            maxWidth: "400px",
-          }}
-        >
-          <h3>Notification Settings</h3>
-          <button
-            onClick={() => setShowHelpDialog(!showHelpDialog)}
-            style={{
-              marginBottom: "10px",
-              background: "#f0f0f0",
-              border: "1px solid #ccc",
-              cursor: "pointer",
-            }}
-          >
-            how to get them?
-          </button>
-          {showHelpDialog && (
-            <div
-              style={{
-                border: "1px solid #aaa",
-                padding: "15px",
-                marginBottom: "15px",
-                background: "#fafafa",
-              }}
-            >
-              <h4>How to get notification settings</h4>
-
-              <p>
-                <b>Discord Webhook Link</b>
-              </p>
-              <ol>
-                <li>Open Discord</li>
-                <li>Go to your server</li>
-                <li>Click Server Settings</li>
-                <li>Integrations → Webhooks</li>
-                <li>Create New Webhook</li>
-                <li>Copy Webhook URL</li>
-              </ol>
-
-              <p>
-                <b>Telegram Bot Token</b>
-              </p>
-              <ol>
-                <li>Open Telegram</li>
-                <li>
-                  Search <b>@BotFather</b>
-                </li>
-                <li>Type /start</li>
-                <li>Type /newbot</li>
-                <li>Follow instructions</li>
-                <li>Copy API token</li>
-              </ol>
-
-              <p>
-                <b>Telegram Chat ID</b>
-              </p>
-              <ol>
-                <li>
-                  Search <b>@userinfobot</b>
-                </li>
-                <li>Click Start</li>
-                <li>Copy your Chat ID</li>
-              </ol>
-
-              <button
-                onClick={() => setShowHelpDialog(false)}
-                style={{ marginTop: "10px" }}
-              >
-                Close
-              </button>
-            </div>
-          )}
-          <div>
-            <label>Webhook Link</label>
-            <input
-              type="text"
-              value={webhook}
-              onChange={(e) => setWebhook(e.target.value)}
-            />
-
-            <br />
-            <br />
-
-            <label>Telegram Bot Token</label>
-            <input
-              type="text"
-              value={telegramToken}
-              onChange={(e) => setTelegramToken(e.target.value)}
-            />
-
-            <br />
-            <br />
-
-            <label>Telegram Chat ID</label>
-            <input
-              type="text"
-              value={chatId}
-              onChange={(e) => setChatId(e.target.value)}
-            />
-
-            <br />
-            <br />
-
-            <button onClick={saveNotification}>Save</button>
-
-            <button
-              onClick={() => setShowNotifyForm(false)}
-              style={{ marginLeft: "10px" }}
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
-      {suggestion && (
-        <div
-          style={{
-            marginTop: "30px",
-            marginBottom: "10px",
-            border: "1px solid #ccc",
-            borderRadius: "8px",
-            padding: "20px",
-            background: "#f9f9ff",
-          }}
-        >
-          <h2 style={{ marginTop: 0 }}>📚 Assignment Suggestions</h2>
-
-          <p style={{ lineHeight: "1.7", color: "#333" }}>
-            {suggestion.study_plan}
-          </p>
-
-          <table
-            style={{
-              width: "100%",
-              borderCollapse: "collapse",
-              marginTop: "16px",
-              fontSize: "0.9rem",
-            }}
-          >
-            <thead>
-              <tr style={{ background: "#e8e8f0" }}>
-                <th style={thStyle}>#</th>
-                <th style={thStyle}>Name</th>
-                <th style={thStyle}>Deadline</th>
-                <th style={thStyle}>Est. Hours</th>
-                <th style={thStyle}>Summary</th>
-              </tr>
-            </thead>
-            <tbody>
-              {suggestion.start_order.map((orderIndex, rank) => {
-                const a = suggestion.assignments[orderIndex - 1];
-                if (!a) return null;
-                const fileName = a.pdf_path.split("/").pop();
-                const deadlineNZ = new Date(a.deadline).toLocaleString(
-                  "en-NZ",
-                  {
-                    timeZone: "Pacific/Auckland",
-                    year: "numeric",
-                    month: "short",
-                    day: "numeric",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  },
-                );
-                return (
-                  <tr
-                    key={rank}
-                    style={{ background: rank % 2 === 0 ? "#fff" : "#f4f4fb" }}
-                  >
-                    <td style={tdStyle}>{rank + 1}</td>
-                    <td style={tdStyle}>{fileName}</td>
-                    <td style={tdStyle}>{deadlineNZ}</td>
-                    <td style={tdStyle}>{a.estimated_hours}h</td>
-                    <td style={tdStyle}>{a.summary}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
-      <ActivityCalendar activities={activities} session={session} />
-    </div>
+    </>
   );
 }
+
+/* ════════════════════════════════
+   ACTIVITY CALENDAR (unchanged logic, polished styles)
+════════════════════════════════ */
 const CATEGORY_COLORS = {
   Work: { bg: "#fff3cd", border: "#f0a500", dot: "#f0a500", label: "#7a5100" },
   Study: { bg: "#d4edff", border: "#3a9bd5", dot: "#3a9bd5", label: "#0a4a75" },
@@ -887,7 +1340,7 @@ function ActivityCalendar({ activities, session }) {
 
   const monthStart = new Date(viewYear, viewMonth, 1);
   const monthEnd = new Date(viewYear, viewMonth + 1, 0);
-  const startPad = monthStart.getDay(); // 0=Sun
+  const startPad = monthStart.getDay();
   const totalCells = Math.ceil((startPad + monthEnd.getDate()) / 7) * 7;
 
   const activitiesByDay = {};
@@ -921,28 +1374,28 @@ function ActivityCalendar({ activities, session }) {
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@300;400;500&display=swap');
-        .cal-wrap { font-family: 'DM Sans', sans-serif; margin-top: 32px; }
+        .cal-wrap { font-family:'Sora',sans-serif; margin-top:0; }
         .cal-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; }
-        .cal-title { font-family:'DM Serif Display',serif; font-size:1.6rem; color:#1a1a2e; letter-spacing:0.02em; }
-        .cal-nav { background:none; border:1.5px solid #d0d0e0; border-radius:8px; width:36px; height:36px; cursor:pointer; font-size:1.1rem; display:flex; align-items:center; justify-content:center; transition:background 0.15s; }
-        .cal-nav:hover { background:#f0f0f8; }
+        .cal-title { font-family:'DM Serif Display',serif; font-size:1.5rem; color:#1a1a2e; letter-spacing:0.01em; }
+        .cal-nav { background:#fff; border:1.5px solid #e0e0ec; border-radius:10px; width:36px; height:36px; cursor:pointer; font-size:1.1rem; display:flex; align-items:center; justify-content:center; transition:all 0.15s; box-shadow:0 2px 6px rgba(0,0,40,0.06); }
+        .cal-nav:hover { background:#1a1a2e; color:#fff; border-color:#1a1a2e; }
         .cal-legend { display:flex; gap:16px; margin-bottom:16px; flex-wrap:wrap; }
-        .cal-legend-item { display:flex; align-items:center; gap:6px; font-size:0.8rem; font-weight:500; }
-        .cal-legend-dot { width:10px; height:10px; border-radius:50%; }
-        .cal-grid { display:grid; grid-template-columns:repeat(7,1fr); border-left:1px solid #e8e8f0; border-top:1px solid #e8e8f0; border-radius:12px; overflow:hidden; box-shadow:0 2px 16px rgba(0,0,40,0.07); }
-        .cal-dow { background:#f5f5fc; padding:10px 0; text-align:center; font-size:0.72rem; font-weight:600; letter-spacing:0.08em; color:#7070a0; text-transform:uppercase; border-right:1px solid #e8e8f0; border-bottom:1px solid #e8e8f0; }
-        .cal-cell { min-height:110px; background:#fff; border-right:1px solid #e8e8f0; border-bottom:1px solid #e8e8f0; padding:8px 6px 6px; display:flex; flex-direction:column; gap:3px; position:relative; }
+        .cal-legend-item { display:flex; align-items:center; gap:6px; font-size:0.78rem; font-weight:600; }
+        .cal-legend-dot { width:9px; height:9px; border-radius:50%; }
+        .cal-grid { display:grid; grid-template-columns:repeat(7,1fr); border:1.5px solid #e8e8f4; border-radius:16px; overflow:hidden; box-shadow:0 4px 20px rgba(0,0,40,0.06); }
+        .cal-dow { background:#f5f5fc; padding:10px 0; text-align:center; font-size:0.68rem; font-weight:700; letter-spacing:0.1em; color:#8888aa; text-transform:uppercase; border-right:1px solid #eeeef8; border-bottom:1px solid #eeeef8; }
+        .cal-cell { min-height:110px; background:#fff; border-right:1px solid #eeeef8; border-bottom:1px solid #eeeef8; padding:8px 6px 6px; display:flex; flex-direction:column; gap:3px; position:relative; }
         .cal-cell.other-month { background:#fafafa; }
-        .cal-cell.today .cal-day-num { background:#1a1a2e; color:#fff; border-radius:50%; width:24px; height:24px; display:flex; align-items:center; justify-content:center; }
-        .cal-day-num { font-size:0.8rem; font-weight:500; color:#444; margin-bottom:2px; width:24px; height:24px; display:flex; align-items:center; justify-content:center; }
-        .cal-chip { border-radius:5px; padding:2px 6px; font-size:0.72rem; font-weight:500; cursor:pointer; border:none; text-align:left; transition:filter 0.15s, transform 0.1s; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; }
+        .cal-cell.today .cal-day-num { background:#1a1a2e; color:#fff; border-radius:50%; }
+        .cal-day-num { font-size:0.78rem; font-weight:600; color:#555; margin-bottom:2px; width:24px; height:24px; display:flex; align-items:center; justify-content:center; }
+        .cal-chip { border-radius:6px; padding:3px 7px; font-size:0.69rem; font-weight:600; cursor:pointer; border:none; text-align:left; transition:filter 0.15s,transform 0.1s; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; font-family:'Sora',sans-serif; }
         .cal-chip:hover { filter:brightness(0.93); transform:scale(1.03); }
-        .cal-more { font-size:0.68rem; color:#8888aa; margin-top:1px; cursor:pointer; }
-        .cal-modal-backdrop { position:fixed; inset:0; background:rgba(10,10,30,0.45); z-index:2000; display:flex; align-items:center; justify-content:center; padding:20px; }
-        .cal-modal { background:#fff; border-radius:16px; max-width:480px; width:100%; max-height:85vh; overflow-y:auto; box-shadow:0 20px 60px rgba(0,0,40,0.25); }
+        .cal-more { font-size:0.66rem; color:#aaa; margin-top:2px; }
+        .cal-modal-backdrop { position:fixed; inset:0; background:rgba(8,8,20,0.55); backdrop-filter:blur(6px); z-index:3000; display:flex; align-items:center; justify-content:center; padding:20px; animation:fadeInBackdrop 0.2s ease; }
+        .cal-modal { background:#fff; border-radius:20px; max-width:480px; width:100%; max-height:85vh; overflow-y:auto; box-shadow:0 32px 80px rgba(0,0,40,0.25); animation:slideUp 0.28s cubic-bezier(0.34,1.56,0.64,1); }
         .cal-modal-inner { padding:24px; }
-        .cal-modal-close { float:right; background:none; border:none; font-size:1.4rem; cursor:pointer; color:#888; line-height:1; }
+        .cal-modal-close { float:right; background:#f4f4f8; border:none; border-radius:8px; width:32px; height:32px; cursor:pointer; font-size:1rem; color:#666; display:flex; align-items:center; justify-content:center; }
+        .cal-modal-close:hover { background:#e8e8f0; }
       `}</style>
 
       <div className="cal-wrap">
@@ -999,11 +1452,7 @@ function ActivityCalendar({ activities, session }) {
                         CATEGORY_COLORS[a.category] || CATEGORY_COLORS.Life;
                       const timeStr = new Date(a.time).toLocaleTimeString(
                         "en-NZ",
-                        {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                          hour12: true,
-                        },
+                        { hour: "2-digit", minute: "2-digit", hour12: true },
                       );
                       return (
                         <button
