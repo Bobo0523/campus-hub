@@ -405,14 +405,27 @@ export default function Dashboard({ session }) {
   }
 
   async function loadActivities() {
+    // fetch hidden activity IDs for this user
+    const { data: hidden } = await supabase
+      .from("hidden_activities")
+      .select("activity_id")
+      .eq("user_id", session.user.id);
+
+    const hiddenIds = hidden ? hidden.map((h) => h.activity_id) : [];
+
+    // fetch all activities
     const { data, error } = await supabase
       .from("activities")
       .select("*")
       .order("time", { ascending: false });
+
     if (error) {
-      console.error(error);
       setMessage("Error loading activities: " + error.message);
-    } else setActivities(data);
+    } else {
+      // filter out hidden ones client-side
+      const visible = data.filter((a) => !hiddenIds.includes(a.id));
+      setActivities(visible);
+    }
   }
 
   async function handleAssignmentSubmit(e) {
@@ -531,7 +544,52 @@ export default function Dashboard({ session }) {
     if (error) alert("This slot is already taken.");
     else loadSlots(selectedDate);
   }
+  async function hideOutdatedActivities() {
+    const confirmed = window.confirm("Delete all past activities?");
+    if (!confirmed) return;
 
+    const now = new Date().toISOString();
+
+    // get outdated activities
+    const { data: outdated, error: fetchError } = await supabase
+      .from("activities")
+      .select("id")
+      .lt("time", now);
+
+    if (fetchError || !outdated?.length) {
+      setMessage("Nothing to delete.");
+      return;
+    }
+
+    // get already-hidden ones so we don't try to insert duplicates
+    const { data: alreadyHidden } = await supabase
+      .from("hidden_activities")
+      .select("activity_id")
+      .eq("user_id", session.user.id);
+
+    const alreadyHiddenIds = new Set(
+      alreadyHidden?.map((h) => h.activity_id) || [],
+    );
+
+    // only insert rows that aren't already hidden
+    const newRows = outdated
+      .filter((a) => !alreadyHiddenIds.has(a.id))
+      .map((a) => ({ user_id: session.user.id, activity_id: a.id }));
+
+    if (!newRows.length) {
+      setMessage("All past activities are already deleted.");
+      return;
+    }
+
+    const { error } = await supabase.from("hidden_activities").insert(newRows);
+
+    if (error) {
+      setMessage("Failed to delete: " + error.message);
+    } else {
+      setMessage("Past activities deleted.");
+      loadActivities();
+    }
+  }
   async function handleSubmit(e) {
     e.preventDefault();
     setMessage("Submitting…");
@@ -607,6 +665,11 @@ export default function Dashboard({ session }) {
               icon="✦"
               label="Submit Activity"
               onClick={() => setShowForm(true)}
+            />
+            <NavBtn
+              icon="❌"
+              label="Delete Past Activities"
+              onClick={hideOutdatedActivities}
             />
             <NavBtn
               icon="📎"
