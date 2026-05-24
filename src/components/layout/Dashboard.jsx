@@ -6,9 +6,8 @@ import "react-calendar/dist/Calendar.css";
 import ActivityCard from "./ActivityCard";
 import { io } from "socket.io-client";
 
-const socket = io("http://localhost:3000");
+const socket = io("https://www.pcwl.cloudns.ch:8443");
 
-/* ─── shared table styles ─── */
 const thStyle = {
   padding: "10px 14px",
   textAlign: "left",
@@ -22,7 +21,7 @@ const tdStyle = {
   verticalAlign: "top",
 };
 
-/* ─── reusable modal backdrop + card ─── */
+// Renders a full-screen backdrop; clicking outside or pressing Escape closes it.
 function Modal({ onClose, children, wide }) {
   useEffect(() => {
     const esc = (e) => e.key === "Escape" && onClose();
@@ -67,6 +66,7 @@ function Modal({ onClose, children, wide }) {
   );
 }
 
+// Renders the icon, title, optional subtitle, and close button at the top of every modal.
 function ModalHeader({ icon, title, subtitle, onClose }) {
   return (
     <div
@@ -138,7 +138,6 @@ function ModalHeader({ icon, title, subtitle, onClose }) {
   );
 }
 
-/* ─── styled input / label helpers ─── */
 const labelStyle = {
   display: "block",
   fontSize: "0.78rem",
@@ -167,6 +166,7 @@ const focusStyle = {
   background: "#fff",
 };
 
+// Wraps a form field with an optional label above it.
 function Field({ label, children }) {
   return (
     <div style={{ marginBottom: "18px" }}>
@@ -176,6 +176,7 @@ function Field({ label, children }) {
   );
 }
 
+// Labelled text input with focus-ring styling.
 function StyledInput({ label, ...props }) {
   const [focused, setFocused] = useState(false);
   return (
@@ -190,6 +191,7 @@ function StyledInput({ label, ...props }) {
   );
 }
 
+// Labelled select dropdown with focus-ring styling.
 function StyledSelect({ label, children, value, onChange, required }) {
   const [focused, setFocused] = useState(false);
   return (
@@ -212,6 +214,7 @@ function StyledSelect({ label, children, value, onChange, required }) {
   );
 }
 
+// Labelled textarea with focus-ring styling.
 function StyledTextarea({ label, ...props }) {
   const [focused, setFocused] = useState(false);
   return (
@@ -231,6 +234,7 @@ function StyledTextarea({ label, ...props }) {
   );
 }
 
+// Primary action button; pass `danger` for a red variant or `disabled` to disable it.
 function PrimaryBtn({ children, disabled, onClick, type = "submit", danger }) {
   return (
     <button
@@ -262,6 +266,7 @@ function PrimaryBtn({ children, disabled, onClick, type = "submit", danger }) {
   );
 }
 
+// Secondary cancel/close button that never submits a form.
 function GhostBtn({ children, onClick }) {
   return (
     <button
@@ -286,7 +291,7 @@ function GhostBtn({ children, onClick }) {
   );
 }
 
-/* ─── nav pill buttons ─── */
+// Pill-shaped navigation button used in the top action bar.
 function NavBtn({ icon, label, onClick, accent }) {
   return (
     <button
@@ -325,9 +330,6 @@ function NavBtn({ icon, label, onClick, accent }) {
   );
 }
 
-/* ═══════════════════════════════════════
-   MAIN DASHBOARD
-════════════════════════════════════════ */
 export default function Dashboard({ session }) {
   const [suggestion, setSuggestion] = useState(null);
   const audioRef = useRef(null);
@@ -370,16 +372,14 @@ export default function Dashboard({ session }) {
     socket.on("meditation_count", (count) => setMeditatingCount(count));
     return () => socket.off("meditation_count");
   }, []);
-
+  // one music, so hard-coded the url.
   useEffect(() => {
-    fetch("http://localhost:3000/music")
-      .then((r) => r.json())
-      .then((data) => {
-        if (data && data[0]?.audio_url) setAudioUrl(data[0].audio_url);
-      })
-      .catch(console.error);
+    const permanentUrl =
+      "https://gwchuwnupzjvxjiidbya.supabase.co/storage/v1/object/public/music/peace.mp3";
+    setAudioUrl(permanentUrl);
   }, []);
 
+  // Countdown timer: ticks every second while a meditation session is running.
   useEffect(() => {
     if (!isRunning) return;
     if (timeLeft <= 0) {
@@ -395,6 +395,7 @@ export default function Dashboard({ session }) {
     return () => clearInterval(id);
   }, [isRunning, timeLeft]);
 
+  // Fetches the AI-generated study plan for this user from `student_suggestions`.
   async function loadSuggestion() {
     const { data, error } = await supabase
       .from("student_suggestions")
@@ -404,8 +405,8 @@ export default function Dashboard({ session }) {
     if (!error && data) setSuggestion(data.suggestion);
   }
 
+  // Loads all activities, filters out ones the user has hidden, and updates state.
   async function loadActivities() {
-    // fetch hidden activity IDs for this user
     const { data: hidden } = await supabase
       .from("hidden_activities")
       .select("activity_id")
@@ -413,7 +414,6 @@ export default function Dashboard({ session }) {
 
     const hiddenIds = hidden ? hidden.map((h) => h.activity_id) : [];
 
-    // fetch all activities
     const { data, error } = await supabase
       .from("activities")
       .select("*")
@@ -422,12 +422,12 @@ export default function Dashboard({ session }) {
     if (error) {
       setMessage("Error loading activities: " + error.message);
     } else {
-      // filter out hidden ones client-side
       const visible = data.filter((a) => !hiddenIds.includes(a.id));
       setActivities(visible);
     }
   }
 
+  // Uploads the selected PDF to Supabase Storage and saves its path and deadline to the database.
   async function handleAssignmentSubmit(e) {
     e.preventDefault();
     if (!assignmentFile || !assignmentDeadline) {
@@ -466,6 +466,7 @@ export default function Dashboard({ session }) {
     setAssignmentUploading(false);
   }
 
+  // Saves the user's Discord webhook and Telegram credentials to the `profiles` table.
   async function saveNotification() {
     const { error } = await supabase.from("profiles").upsert({
       user_id: session.user.id,
@@ -480,11 +481,13 @@ export default function Dashboard({ session }) {
     }
   }
 
+  // Updates the selected date and fetches available slots for that day.
   function handleDateChange(date) {
     setSelectedDate(date);
     loadSlots(date);
   }
 
+  // Queries inspection bookings for the given date and builds an hourly slot list (09:00–16:00).
   async function loadSlots(date) {
     const start = new Date(date);
     start.setHours(0, 0, 0, 0);
@@ -504,6 +507,7 @@ export default function Dashboard({ session }) {
     setSlots(list);
   }
 
+  // Starts the meditation countdown, emits a socket event, and begins playing background music.
   async function startMeditation(minutes) {
     setDuration(minutes);
     setTimeLeft(minutes * 60);
@@ -520,6 +524,7 @@ export default function Dashboard({ session }) {
     }
   }
 
+  // Stops the meditation session, resets timer state, and closes the modal.
   async function stopMeditation() {
     setIsRunning(false);
     setDuration(null);
@@ -532,6 +537,7 @@ export default function Dashboard({ session }) {
     setShowMeditation(false);
   }
 
+  // Books an inspection slot for the current user at the given hour on the selected date.
   async function bookSlot(hour) {
     const d = new Date(selectedDate);
     d.setHours(hour, 0, 0, 0);
@@ -544,13 +550,14 @@ export default function Dashboard({ session }) {
     if (error) alert("This slot is already taken.");
     else loadSlots(selectedDate);
   }
+
+  // Hides all past activities from the user's calendar by inserting them into `hidden_activities`.
   async function hideOutdatedActivities() {
     const confirmed = window.confirm("Delete all past activities?");
     if (!confirmed) return;
 
     const now = new Date().toISOString();
 
-    // get outdated activities
     const { data: outdated, error: fetchError } = await supabase
       .from("activities")
       .select("id")
@@ -561,7 +568,6 @@ export default function Dashboard({ session }) {
       return;
     }
 
-    // get already-hidden ones so we don't try to insert duplicates
     const { data: alreadyHidden } = await supabase
       .from("hidden_activities")
       .select("activity_id")
@@ -571,7 +577,6 @@ export default function Dashboard({ session }) {
       alreadyHidden?.map((h) => h.activity_id) || [],
     );
 
-    // only insert rows that aren't already hidden
     const newRows = outdated
       .filter((a) => !alreadyHiddenIds.has(a.id))
       .map((a) => ({ user_id: session.user.id, activity_id: a.id }));
@@ -590,6 +595,8 @@ export default function Dashboard({ session }) {
       loadActivities();
     }
   }
+
+  // Inserts a new activity row into the database and refreshes the calendar.
   async function handleSubmit(e) {
     e.preventDefault();
     setMessage("Submitting…");
@@ -641,7 +648,6 @@ export default function Dashboard({ session }) {
           className="hub-root"
           style={{ padding: "32px 28px", maxWidth: "1200px", margin: "0 auto" }}
         >
-          {/* ── PAGE HEADER ── */}
           <div
             className="px-4 py-5 text-center text-white rounded-4"
             style={{ background: "linear-gradient(135deg, #1a1a2e, #3a3a6e)" }}
@@ -652,7 +658,6 @@ export default function Dashboard({ session }) {
             </p>
           </div>
 
-          {/* ── NAV BUTTONS ── */}
           <div
             style={{
               display: "flex",
@@ -720,7 +725,6 @@ export default function Dashboard({ session }) {
             </div>
           )}
 
-          {/* ── SUGGESTION PANEL ── */}
           {suggestion && (
             <div
               style={{
@@ -806,9 +810,7 @@ export default function Dashboard({ session }) {
           <ActivityCalendar activities={activities} session={session} />
         </div>
       </div>
-      {/* ════════════════════════════════
-          MODAL: SUBMIT ACTIVITY
-      ════════════════════════════════ */}
+
       {showForm && (
         <Modal onClose={() => setShowForm(false)}>
           <ModalHeader
@@ -875,9 +877,6 @@ export default function Dashboard({ session }) {
         </Modal>
       )}
 
-      {/* ════════════════════════════════
-          MODAL: SUBMIT ASSIGNMENT
-      ════════════════════════════════ */}
       {showAssignmentForm && (
         <Modal
           onClose={() => {
@@ -1005,9 +1004,6 @@ export default function Dashboard({ session }) {
         </Modal>
       )}
 
-      {/* ════════════════════════════════
-          MODAL: NOTIFICATION SETTINGS
-      ════════════════════════════════ */}
       {showNotifyForm && (
         <Modal onClose={() => setShowNotifyForm(false)}>
           <ModalHeader
@@ -1104,9 +1100,6 @@ export default function Dashboard({ session }) {
         </Modal>
       )}
 
-      {/* ════════════════════════════════
-          MODAL: BOOK INSPECTION TIME
-      ════════════════════════════════ */}
       {showCalendar && (
         <Modal onClose={() => setShowCalendar(false)} wide>
           <ModalHeader
@@ -1225,9 +1218,6 @@ export default function Dashboard({ session }) {
         </Modal>
       )}
 
-      {/* ════════════════════════════════
-          MODAL: MEDITATION
-      ════════════════════════════════ */}
       {showMeditation && (
         <Modal onClose={() => !isRunning && setShowMeditation(false)}>
           <div
@@ -1387,14 +1377,16 @@ export default function Dashboard({ session }) {
 }
 
 /* ════════════════════════════════
-   ACTIVITY CALENDAR (unchanged logic, polished styles)
+   ACTIVITY CALENDAR
 ════════════════════════════════ */
+
 const CATEGORY_COLORS = {
   Work: { bg: "#fff3cd", border: "#f0a500", dot: "#f0a500", label: "#7a5100" },
   Study: { bg: "#d4edff", border: "#3a9bd5", dot: "#3a9bd5", label: "#0a4a75" },
   Life: { bg: "#d4f5e9", border: "#2eaf78", dot: "#2eaf78", label: "#0a5235" },
 };
 
+// Renders a monthly calendar grid with colour-coded activity chips; clicking a chip opens a detail modal.
 function ActivityCalendar({ activities, session }) {
   const today = new Date();
   const [viewYear, setViewYear] = useState(today.getFullYear());
@@ -1416,12 +1408,15 @@ function ActivityCalendar({ activities, session }) {
     }
   });
 
+  // Navigates to the previous month, wrapping to the previous year if needed.
   function prevMonth() {
     if (viewMonth === 0) {
       setViewYear((y) => y - 1);
       setViewMonth(11);
     } else setViewMonth((m) => m - 1);
   }
+
+  // Navigates to the next month, wrapping to the next year if needed.
   function nextMonth() {
     if (viewMonth === 11) {
       setViewYear((y) => y + 1);

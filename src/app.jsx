@@ -1,4 +1,3 @@
-// App.jsx 的逻辑雏形
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { useState, useEffect } from "react";
 import AuthForm from "./components/auth/AuthForm";
