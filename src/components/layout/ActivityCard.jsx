@@ -31,7 +31,7 @@ export default function ActivityCard({ activity, session }) {
       const activityDate = new Date(activity.time);
       const now = new Date();
 
-      // 1️⃣ past activity → do not show weather
+      // do not show weather for past activities
       if (activityDate < now) {
         setWeather("past");
         return;
@@ -53,7 +53,7 @@ export default function ActivityCard({ activity, session }) {
         return;
       }
 
-      // 3️⃣ find closest forecast
+      // find closest forecast
 
       const activityTime = activityDate.getTime();
 
@@ -158,15 +158,14 @@ export default function ActivityCard({ activity, session }) {
     const isApple = /iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent);
 
     if (isApple) {
-      // webcal:// is handled by the OS → opens Calendar.app directly, no download
-      const webcalUrl =
-        `http://rich-ghosts-mix.loca.lt/api/calendar/${activity.id}`.replace(
-          "http://",
-          "webcal://",
-        );
+      // string concatenation
+      const secureBackendUrl = `https://www.pcwl.cloudns.ch:8443/api/calendar/${activity.id}`;
+
+      const webcalUrl = secureBackendUrl.replace("https://", "webcal://");
+
       window.location.href = webcalUrl;
     } else {
-      // Google Calendar pre-filled URL → opens in browser tab, no download
+      // Google Calendar
       const googleUrl = new URL("https://calendar.google.com/calendar/render");
       googleUrl.searchParams.set("action", "TEMPLATE");
       googleUrl.searchParams.set("text", activity.title);
