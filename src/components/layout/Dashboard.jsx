@@ -340,6 +340,7 @@ export default function Dashboard({ session }) {
   const [time, setTime] = useState("");
   const [payment, setPayment] = useState("");
   const [location, setLocation] = useState("");
+  const [restriction, setRestriction] = useState("");
   const [showNotifyForm, setShowNotifyForm] = useState(false);
   const [showHelpDialog, setShowHelpDialog] = useState(false);
   const [webhook, setWebhook] = useState("");
@@ -607,6 +608,7 @@ export default function Dashboard({ session }) {
         time: new Date(time).toISOString(),
         payment: payment || null,
         location,
+        restriction: restriction || null,
         user_id: session.user.id,
       },
     ]);
@@ -621,6 +623,7 @@ export default function Dashboard({ session }) {
     setTime("");
     setPayment("");
     setLocation("");
+    setRestriction("");
     setShowForm(false);
     loadActivities();
   }
@@ -861,6 +864,13 @@ export default function Dashboard({ session }) {
               value={location}
               onChange={(e) => setLocation(e.target.value)}
               required
+            />
+            <StyledInput
+              label="Restriction (Optional)"
+              type="text"
+              placeholder="Only for..."
+              value={restriction}
+              onChange={(e) => setRestriction(e.target.value)}
             />
             <div
               style={{

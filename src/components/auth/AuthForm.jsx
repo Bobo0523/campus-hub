@@ -45,7 +45,7 @@ function AuthForm() {
 
   return (
     <div style={{ padding: "40px" }}>
-      <h2>Waikato Student Login</h2>
+      <h2>Waikato Student Signup/Login</h2>
 
       <input
         type="email"
@@ -57,7 +57,7 @@ function AuthForm() {
       <br />
       <br />
 
-      <button onClick={sendCode}>Send Login Code</button>
+      <button onClick={sendCode}>Send Signup/Login Code</button>
 
       {showOTP && (
         <div>

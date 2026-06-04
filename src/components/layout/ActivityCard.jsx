@@ -190,6 +190,22 @@ export default function ActivityCard({ activity, session }) {
       <b>{activity.title}</b>
 
       <p>{new Date(activity.time).toLocaleString()}</p>
+      {activity.restriction && (
+        <p
+          style={{
+            fontSize: "0.82rem",
+            color: "#7a5100",
+            background: "#fff3cd",
+            borderRadius: "6px",
+            padding: "3px 8px",
+            display: "inline-block",
+            marginTop: "-4px",
+            marginBottom: "4px",
+          }}
+        >
+          🔒 {activity.restriction}
+        </p>
+      )}
       {weather === "past" ? null : weather === "noforecast" ? (
         <p style={{ color: "gray" }}>No weather forecast available</p>
       ) : weather ? (
